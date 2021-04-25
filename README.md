@@ -1,10 +1,37 @@
 # ztf_fp.py
 Library to streamline requesting Zwicky Transient Facility (ZTF) forced photometry.
 
+## A simple command line example
+
+```
+python ztf_fp.py 256.7975042 58.0974194 -source_name 2021kjb
+```
+### Output
+```
+Sending ZTF request for (R.A.,Decl)=(256.7975042,58.0974194)
+wget --http-user=ztffps --http-passwd=dontgocrazy! -O ztffp_493YUZW74Q.txt "https://ztfweb.ipac.caltech.edu/cgi-bin/requestForcedPhotometry.cgi?ra=256.797504&dec=58.097419&jdstart=2459269.628723&jdend=2459329.628723&email=<REDACTED>&userpass=<REDACTED>"
+
+Waiting for the email (rechecking every 20 seconds).
+Downloading file...
+	wget --http-user=ztffps --http-password=dontgocrazy! -O forcedphotometry_req00015274_lc.txt "https://ztfweb.ipac.caltech.edu/ztf/ops/forcedphot/lc/0/15/req15274/cksum16bf0dfcd7fc6781336f6d0792a8874d/forcedphotometry_req00015274_lc.txt"
+Downloading file...
+	wget --http-user=ztffps --http-password=dontgocrazy! -O forcedphotometry_req00015274_log.txt "https://ztfweb.ipac.caltech.edu/ztf/ops/forcedphot/lc/0/15/req15274/cksum16bf0dfcd7fc6781336f6d0792a8874d/forcedphotometry_req00015274_log.txt"
+Downloaded: 2021kjb_lc.txt
+Downloaded: 2021kjb_log.txt
+ZTF_r: 15 detections and 3 upper limits.
+ZTF_g: 13 detections and 4 upper limits.
+Creating ./2021kjb
+     ZTF wget log: ./2021kjb/ztffp_493YUZW74Q.txt
+     ZTF downloaded file: ./2021kjb/2021kjb_lc.txt
+     ZTF downloaded file: ./2021kjb/2021kjb_log.txt
+     ZTF figure: ./2021kjb/2021kjb_lc.png
+```
+
 ## Requirements
 ### Software installed on your system
 - python 3 (tested on python 3.7-3.9)
 - wget (MacOS often is missing this. If so, check out brew, macports or anaconda.)
+- Email address reachable with IMAP
 
 ### Python libraries
 - astropy (for possible time and coordinate conversions)
@@ -52,34 +79,30 @@ export ztf_user_address
 ```
 or the equivalent for csh and tcsh shells.
 
+### Check your email configuration
 
-## Running through the command line
-A simple example
-```
->python ztf_fp.py 256.7975042 58.0974194 -source_name 2021kjb
-Sending ZTF request for (R.A.,Decl)=(256.7975042,58.0974194)
-wget --http-user=ztffps --http-passwd=dontgocrazy! -O ztffp_493YUZW74Q.txt "https://ztfweb.ipac.caltech.edu/cgi-bin/requestForcedPhotometry.cgi?ra=256.797504&dec=58.097419&jdstart=2459269.628723&jdend=2459329.628723&email=<REDACTED>&userpass=<REDACTED>"
+Run the following to see if the script can access your email with the provided credentials
 
-Waiting for the email (rechecking every 20 seconds).
-Downloading file...
-	wget --http-user=ztffps --http-password=dontgocrazy! -O forcedphotometry_req00015274_lc.txt "https://ztfweb.ipac.caltech.edu/ztf/ops/forcedphot/lc/0/15/req15274/cksum16bf0dfcd7fc6781336f6d0792a8874d/forcedphotometry_req00015274_lc.txt"
-Downloading file...
-	wget --http-user=ztffps --http-password=dontgocrazy! -O forcedphotometry_req00015274_log.txt "https://ztfweb.ipac.caltech.edu/ztf/ops/forcedphot/lc/0/15/req15274/cksum16bf0dfcd7fc6781336f6d0792a8874d/forcedphotometry_req00015274_log.txt"
-Downloaded: 2021kjb_lc.txt
-Downloaded: 2021kjb_log.txt
-ZTF_r: 15 detections and 3 upper limits.
-ZTF_g: 13 detections and 4 upper limits.
-Creating ./2021kjb
-     ZTF wget log: ./2021kjb/ztffp_493YUZW74Q.txt
-     ZTF downloaded file: ./2021kjb/2021kjb_lc.txt
-     ZTF downloaded file: ./2021kjb/2021kjb_log.txt
-     ZTF figure: ./2021kjb/2021kjb_lc.png
+#### Input
 ```
+python ztf_fp.py -emailtest
+```
+#### Successful output
+```
+Your email inbox was found and contains 600 messages.
+If this is not correct, please check your settings.
+```
+#### Output if it definitely is not working
+```
+Your inbox was not located. Please check your settings.
+```
+
+
+## More about running on the command line
 
 Sexagesimal coordinates are also supported:
 ```
 python ztf_fp.py 17:07:11.40 +58:05:50.71 -source_name 2021kjb
-
 ```
 
 By default, the script requests forced photometry from the 60 days prior to the moment you submit the job (equivalent to ```-days 60```), but this is easily changed. 
@@ -87,7 +110,7 @@ By default, the script requests forced photometry from the 60 days prior to the 
 You may also specify date ranges in JD (```-jdstart``` and ```jdend``` arguments) or MJD (```-mjdstart``` and ```mjdend``` arguments).
 
 
-## List of available options
+### List of available options
 ```
 usage: ztf_fp.py <ra> <decl> [-h] [-logfile [logfile]] [-plotfile [plotfile]] [-emailtest] [-source_name [source_name]] [-mjdstart [mjdstart]]
                              [-mjdend [mjdend]] [-jdstart [jdstart]] [-jdend [jdend]] [-ztf_all_jd] [-days [days]] [-emailcheck [emailcheck]]
