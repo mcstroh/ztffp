@@ -1,5 +1,9 @@
-# ztf_fp.py
-Library to streamline requesting Zwicky Transient Facility (ZTF) forced photometry.
+# ztf_fp
+Author: Michael Stroh, Northwestern University
+
+Website: [www.michaelcstroh.com](https://www.michaelcstroh.com)
+
+A python library to streamline requesting Zwicky Transient Facility (ZTF) forced photometry.
 
 ## A simple command line example
 
@@ -46,7 +50,7 @@ git clone https://github.com/mcstroh/ztf_fp.git
 ```
 
 ## Setup
-The library requires your ZTF forced photometry credentials (email and password) and your credentials to access your email address where the links to the ZTF light curve are sent.
+The library requires your ZTF forced photometry credentials (email and password), and your credentials to access your email address where the links to the ZTF light curve are sent.
 
 For bash/zsh equivalents (e.g., .bashrc, .bash_profile, .zshrc, etc)
 
@@ -108,7 +112,7 @@ python ztf_fp.py 17:07:11.40 +58:05:50.71 -source_name 2021kjb
 
 By default, the script requests forced photometry from the 60 days prior to the moment you submit the job (equivalent to ```-days 60```), but this is easily changed. 
 
-You may also specify date ranges in JD (```-jdstart``` and ```jdend``` arguments) or MJD (```-mjdstart``` and ```mjdend``` arguments).
+You may also specify date ranges in JD (```-jdstart``` and ```-jdend``` arguments) or MJD (```-mjdstart``` and ```-mjdend``` arguments).
 
 
 ### List of available options
@@ -185,3 +189,6 @@ def batch_ztf_forced_photometry():
 ```
 
 If you are not interested in the output files, you can direct the files to /tmp using the ```-directory_path``` option.
+
+## Acknowledgements
+This project is created at the [Center for Interdisciplinary Exploration and Research in Astrophysics](https://ciera.northwestern.edu) at [Northwestern University](https://www.northwestern.edu/). This work is supported by the Heising-Simons Foundation under grant #2018-0911 awarded to [Raffaella Margutti](https://sites.northwestern.edu/raffaellamargutti).
