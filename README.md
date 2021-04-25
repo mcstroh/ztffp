@@ -1,5 +1,5 @@
 # ztf_fp
-Author: Michael Stroh, Northwestern University
+Author: Michael C. Stroh, Northwestern University
 
 Website: [www.michaelcstroh.com](https://www.michaelcstroh.com)
 
