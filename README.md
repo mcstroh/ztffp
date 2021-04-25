@@ -33,7 +33,7 @@ Creating ./2021kjb
 
 ## Requirements
 ### Software installed on your system
-- python 3 (tested on python 3.7-3.9)
+- python 3.6+
 - wget (MacOS often is missing this. If so, check out brew, macports or anaconda.)
 - Email address reachable with IMAP
 
