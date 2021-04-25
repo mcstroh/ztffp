@@ -56,7 +56,7 @@ or the equivalent for csh and tcsh shells.
 ## Running through the command line
 A simple example
 ```
-python ztf_fp.py 256.7975042 58.0974194 -source_name 2021kjb
+>python ztf_fp.py 256.7975042 58.0974194 -source_name 2021kjb
 Sending ZTF request for (R.A.,Decl)=(256.7975042,58.0974194)
 wget --http-user=ztffps --http-passwd=dontgocrazy! -O ztffp_493YUZW74Q.txt "https://ztfweb.ipac.caltech.edu/cgi-bin/requestForcedPhotometry.cgi?ra=256.797504&dec=58.097419&jdstart=2459269.628723&jdend=2459329.628723&email=<REDACTED>&userpass=<REDACTED>"
 
