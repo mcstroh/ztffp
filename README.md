@@ -79,9 +79,10 @@ export ztf_user_address
 ```
 or the equivalent for csh and tcsh shells.
 
-### Check your email configuration
+### Check your email configuration - IMPORTANT TO DO THIS FIRST!
+It is important to verify that the script is able to use your email credentials so that you don't spam the ZTF forced photometry service with duplicate requests while you debug your email setup.
 
-Run the following to see if the script can access your email with the provided credentials
+Run the following to see if the script can access your email with the provided credentials.
 
 #### Input
 ```
