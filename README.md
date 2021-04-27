@@ -153,20 +153,38 @@ optional arguments:
 
 ## Automated / batch job requests
 
-This file supports being imported as a library and called for batch processing. Below is an example of an *external script* using the Pool module to call the function over a number of positions.
+This file supports being imported as a library and called for batch processing. See ztf_bulk_example.py for a working example of calling ztf_fp.py using an external script.
 
+Below we show the body of ztf_bulk_example.py
 ```
+#! python
+#
+# Run ztf_fp.py on a list of coordinates
+#
+# M.C. Stroh (Northwestern University)
+#
+#
 from multiprocessing import Pool, cpu_count
+import numpy as np
+import pandas as pd
 import ztf_fp
+
+
 
 def ztf_forced_photometry(row):
 
     # Send ZTF forced photometry request
-    ztf_file_names = ztf_fp.run_ztf_fp(days=20, ra=row.ra, decl=row.decl, source_name=row.name, directory_path='/tmp', verbose=True)
+    ztf_file_names = ztf_fp.run_ztf_fp(days=20, ra=row.ra, decl=row.decl, source_name=row.source_name, directory_path='/tmp', verbose=False, do_plot=False)
     
+
     #
     # Do something intelligent with the output
-    #
+    #     For this example we'll simply list the files
+    for ztf_file_name in ztf_file_names:
+        print(ztf_file_name)
+
+    return
+
 
 
 def batch_ztf_forced_photometry():
@@ -177,18 +195,42 @@ def batch_ztf_forced_photometry():
     data = [['2021kcc',194.0331000,-4.9606139],['2021jze',154.9723750,-3.7354000]]
     
     # The column names are used in the ztf_forced_photometry function defined above
-    df = pd.DataFrame(data, columns = ['name','ra','decl'])
+    df = pd.DataFrame(data, columns = ['source_name','ra','decl'])
 
 
     n_workers = int(np.floor(cpu_count()/2)) # Requires casting as an integer for pool argument / don't hit the ZTF server too hard
     pool_vals = [x for _, x in df.iterrows()] # Turn to list for pool mapping function below
-    print(pool_vals)
+
+    # Now send to the list to be completed
     print(f"Processing {len(pool_vals)} ZTF forced photometry requests utilizing {n_workers} workers.")
-    with Pool(n_workers) as ztf_pool:
-         res = ztf_pool.map(ztf_forced_photometry, pool_vals)  
+    ztf_pool = Pool(n_workers)
+    res = ztf_pool.map(ztf_forced_photometry, pool_vals)  
+    ztf_pool.close()
+    ztf_pool.join()
+
+
+
+if __name__ == "__main__":
+    batch_ztf_forced_photometry()
 ```
 
-If you are not interested in the output files, you can direct the files to /tmp using the ```-directory_path``` option.
+### Output
+```
+Processing 2 ZTF forced photometry requests utilizing 4 workers.
+Sending ZTF request for (R.A.,Decl)=(194.0331,-4.9606139)
+wget --http-user=ztffps --http-passwd=dontgocrazy! -O ztffp_TAFLM4V59R.txt "https://ztfweb.ipac.caltech.edu/cgi-bin/requestForcedPhotometry.cgi?ra=194.0331&dec=-4.960614&jdstart=2459311.592520&jdend=2459331.592520&email=<REDACTED>&userpass=<REDACTED>"
+Sending ZTF request for (R.A.,Decl)=(154.972375,-3.7354)
+wget --http-user=ztffps --http-passwd=dontgocrazy! -O ztffp_4B3X481ZRP.txt "https://ztfweb.ipac.caltech.edu/cgi-bin/requestForcedPhotometry.cgi?ra=154.972375&dec=-3.7354&jdstart=2459311.592520&jdend=2459331.592520&email=<REDACTED>&userpass=<REDACTED>"
+
+
+/tmp/2021kcc/ztffp_TAFLM4V59R.txt
+/tmp/2021kcc/2021kcc_lc.txt
+/tmp/2021kcc/2021kcc_log.txt
+/tmp/2021jze/ztffp_4B3X481ZRP.txt
+/tmp/2021jze/2021jze_lc.txt
+/tmp/2021jze/2021jze_log.txt
+```
+If you are not interested in the output files, you can direct the files to /tmp using the ```-directory_path``` option similar to the above example.
 
 ## Acknowledgements
 This project is created at the [Center for Interdisciplinary Exploration and Research in Astrophysics](https://ciera.northwestern.edu) at [Northwestern University](https://www.northwestern.edu/). This work is supported by the Heising-Simons Foundation under grant #2018-0911 awarded to [Raffaella Margutti](https://sites.northwestern.edu/raffaellamargutti).
