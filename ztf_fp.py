@@ -217,8 +217,7 @@ def test_email_connection(n_attempts = 5):
 #
 # Look for email to download data products
 # 
-def query_ztf_email(log_file_name, source_name=None, verbose=True):
-
+def query_ztf_email(log_file_name, source_name='temp', verbose=True):
 
     downloaded_file_names = None
 
@@ -284,18 +283,15 @@ def query_ztf_email(log_file_name, source_name=None, verbose=True):
     
                                 # Download each file
                                 lc_initial_file_name = download_ztf_url(lc_url, verbose=verbose)
-                                log_initial_file_name = download_ztf_url(log_url, verbose=verbose)
+                                log_initial_file_name = download_ztf_url(log_url, verbose=verbose)    
     
-    
-                                # Rename
-                                if source_name is None:
-                                    downloaded_file_names = [lc_initial_file_name, log_initial_file_name]
-                                else:
-                                    lc_final_name = f"{source_name.replace(' ','')}_{lc_initial_file_name.split('_')[-1]}"
-                                    log_final_name = f"{source_name.replace(' ','')}_{log_initial_file_name.split('_')[-1]}"
-                                    os.rename(lc_initial_file_name, lc_final_name)
-                                    os.rename(log_initial_file_name, log_final_name)
-                                    downloaded_file_names = [lc_final_name, log_final_name]
+                                # Rename files
+                                lc_final_name = f"{source_name.replace(' ','')}_{lc_initial_file_name.split('_')[-1]}"
+                                log_final_name = f"{source_name.replace(' ','')}_{log_initial_file_name.split('_')[-1]}"
+                                os.rename(lc_initial_file_name, lc_final_name)
+                                os.rename(log_initial_file_name, log_final_name)
+                                downloaded_file_names = [lc_final_name, log_final_name]
+
 
         imap.close()
         imap.logout()
@@ -547,6 +543,7 @@ def run_ztf_fp(all_jd=False, days=60, decl=None, directory_path='.',
                     print(f"Waiting for the email (rechecking every {emailcheck} seconds).")
 
             downloaded_file_names = query_ztf_email(log_file_name, source_name=source_name, verbose=verbose)
+
             if downloaded_file_names == -1:
                 if verbose:
                     print(f"{log_file_name} was not found.")
