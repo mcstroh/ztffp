@@ -42,7 +42,7 @@ Creating ./2021kjb
 - matplotlib (for possible plotting, but easily removable)
 - numpy
 - pandas 
-
+- lxml
 
 ## Installation
 ```
