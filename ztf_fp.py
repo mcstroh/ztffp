@@ -118,8 +118,15 @@ def download_ztf_url(url, verbose=True):
 
 
 
-def match_ztf_message(job_info, message_body, message_time_epoch):
-
+def match_ztf_message(job_info, message_body, message_time_epoch, time_delta=10, new_email_matching=False, angular_separation=2):
+    '''
+    Check if the given email matches the information passed from the log file via job_info.
+    If a similar request was passed prior to the submission, you may need to use the 
+    only_require_new_email parameter because the information won't exactly match.
+    In this case, look only for a close position, the relevant body text, and ensure that the 
+    email was sent after the request.
+    '''
+    
     match = False
 
     #
@@ -133,6 +140,15 @@ def match_ztf_message(job_info, message_body, message_time_epoch):
     message_lines = message_body.splitlines()
 
     for line in message_lines:
+
+        #
+        # Incomplete data product
+        #
+        if re.search("A request similar to yours is waiting to be processed", line):
+            match = False
+            break # Stop early if this isn't a finished data product
+
+
         if re.search("reqid", line):
 
             inputs = line.split('(')[-1]
@@ -148,13 +164,27 @@ def match_ztf_message(job_info, message_body, message_time_epoch):
                 test_minjd = inputs.split('startJD=')[-1].split(',')[0]
                 test_maxjd = inputs.split('endJD=')[-1].split(',')[0]
                 
-            # Call this a match only if parameters match
-            if np.format_float_positional(float(test_ra), precision=6, pad_right=6).replace(' ','0') == job_info['ra'].to_list()[0] and \
-               np.format_float_positional(float(test_decl), precision=6, pad_right=6).replace(' ','0') == job_info['dec'].to_list()[0] and \
-               np.format_float_positional(float(test_minjd), precision=6, pad_right=6).replace(' ','0') == job_info['jdstart'].to_list()[0] and \
-               np.format_float_positional(float(test_maxjd), precision=6, pad_right=6).replace(' ','0') == job_info['jdend'].to_list()[0]:
+            if new_email_matching:
 
-               match = True
+                # Call this a match only if parameters match
+                if np.format_float_positional(float(test_ra), precision=6, pad_right=6).replace(' ','0') == job_info['ra'].to_list()[0] and \
+                   np.format_float_positional(float(test_decl), precision=6, pad_right=6).replace(' ','0') == job_info['dec'].to_list()[0] and \
+                   (np.format_float_positional(float(test_minjd), precision=6, pad_right=6).replace(' ','0') == job_info['jdstart'].to_list()[0] and \
+                   np.format_float_positional(float(test_maxjd), precision=6, pad_right=6).replace(' ','0') == job_info['jdend'].to_list()[0]) or ( \
+                       float(test_minjd) - time_delta < float(job_info['jdstart'].to_list()[0]) and float(test_minjd) + time_delta > float(job_info['jdstart'].to_list()[0]) and \
+                       float(test_maxjd) - time_delta < float(job_info['jdend'].to_list()[0]) and float(test_maxjd) + time_delta > float(job_info['jdend'].to_list()[0])):
+
+                   match = True
+                
+            else:
+
+                # Check if new and positions are similar
+                submitted_skycoord = SkyCoord(job_info["ra"], job_info["dec"], frame='icrs', unit='deg')
+                email_skycoord = SkyCoord(test_ra, test_decl, frame='icrs', unit='deg')
+                if submitted_skycoord.separation(email_skycoord).arcsecond < angular_separation and \
+                    message_time_epoch > job_info['cdatetime'].to_list()[0]:
+
+                    match = True
 
 
     return match
@@ -217,7 +247,7 @@ def test_email_connection(n_attempts = 5):
 #
 # Look for email to download data products
 # 
-def query_ztf_email(log_file_name, source_name='temp', verbose=True):
+def query_ztf_email(log_file_name, source_name='temp', new_email_matching=False, verbose=True):
 
     downloaded_file_names = None
 
@@ -271,7 +301,7 @@ def query_ztf_email(log_file_name, source_name='temp', verbose=True):
                         # Check if this is the correct one
                         #
                         if content_type=="text/plain":
-                            processing_match = match_ztf_message(job_info, body, local_date)
+                            processing_match = match_ztf_message(job_info, body, local_date, new_email_matching)
                             subject, encoding = email.header.decode_header(msg.get("Subject"))[0]
 
                             if processing_match:
@@ -469,7 +499,7 @@ def run_ztf_fp(all_jd=False, days=60, decl=None, directory_path='.',
                do_plot=True, emailcheck=20, fivemindelay=60, jdend=None, 
                jdstart=None, logfile=None, mjdend=None, mjdstart=None, 
                plotfile=None, ra=None, skip_clean=False, source_name='temp', 
-               test_email=False, verbose=False):
+               test_email=False, new_email_matching=False, verbose=False):
 
 
     #
@@ -542,7 +572,7 @@ def run_ztf_fp(all_jd=False, days=60, decl=None, directory_path='.',
                 if verbose:
                     print(f"Waiting for the email (rechecking every {emailcheck} seconds).")
 
-            downloaded_file_names = query_ztf_email(log_file_name, source_name=source_name, verbose=verbose)
+            downloaded_file_names = query_ztf_email(log_file_name, source_name=source_name, new_email_matching=new_email_matching, verbose=verbose)
 
             if downloaded_file_names == -1:
                 if verbose:
@@ -591,28 +621,28 @@ def run_ztf_fp(all_jd=False, days=60, decl=None, directory_path='.',
         # Wget log file
         output_files = list()
         if log_file_name is not None and os.path.exists(log_file_name):
-            shutil.move(log_file_name, f"{output_directory}/{log_file_name}")
+            shutil.move(log_file_name, f"{output_directory}/{log_file_name.split('/')[-1]}")
             if verbose:
-                print(f"{' '*5}ZTF wget log: {output_directory}/{log_file_name}")
-            output_files.append(f"{output_directory}/{log_file_name}")
+                print(f"{' '*5}ZTF wget log: {output_directory}/{log_file_name.split('/')[-1]}")
+            output_files.append(f"{output_directory}/{log_file_name.split('/')[-1]}")
 
 
         # Downloaded files
         if isinstance(downloaded_file_names, list):
             for downloaded_file_name in downloaded_file_names:
                 if os.path.exists(downloaded_file_name):
-                    shutil.move(downloaded_file_name, f"{output_directory}/{downloaded_file_name}")
+                    shutil.move(downloaded_file_name, f"{output_directory}/{downloaded_file_name.split('/')[-1]}")
                     if verbose:
-                        print(f"{' '*5}ZTF downloaded file: {output_directory}/{downloaded_file_name}")
-                    output_files.append(f"{output_directory}/{downloaded_file_name}")
+                        print(f"{' '*5}ZTF downloaded file: {output_directory}/{downloaded_file_name.split('/')[-1]}")
+                    output_files.append(f"{output_directory}/{downloaded_file_name.split('/')[-1]}")
 
 
         # Figure
         if figure_file_name is not None and os.path.exists(figure_file_name):
-            shutil.move(figure_file_name, f"{output_directory}/{figure_file_name}")
+            shutil.move(figure_file_name, f"{output_directory}/{figure_file_name.split('/')[-1]}")
             if verbose:
-                print(f"{' '*5}ZTF figure: {output_directory}/{figure_file_name}")
-            output_files.append(f"{output_directory}/{figure_file_name}")
+                print(f"{' '*5}ZTF figure: {output_directory}/{figure_file_name.split('/')[-1]}")
+            output_files.append(f"{output_directory}/{figure_file_name.split('/')[-1]}")
 
     if len(output_files)==0 or isinstance(output_files, list)==False:
         output_files = None
@@ -674,6 +704,9 @@ def main():
                    help='Path to directory for clean-up. Requires -directory option.') 
     parser.add_argument('-fivemindelay', metavar='fivemindelay', type=float, nargs='?', default=60, 
                    help='How often (in seconds) to query the email after 5 minutes have elapsed.')    
+    parser.add_argument('-email_matching', action='store_false', dest='new_email_matching',
+                   help='Use the alternative constraints requiring a new email, and similar positions, but no time matching.')
+    parser.set_defaults(new_email_matching=True)
     parser.add_argument('-skip_plot', action='store_false', dest='do_plot',
                    help='Skip making the plot. Useful for automated and batch use cases, or if user wants to use their personal plotting code.')
     parser.set_defaults(do_plot=True)
