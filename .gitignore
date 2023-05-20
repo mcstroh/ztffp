@@ -1,0 +1,19 @@
+# General things to ignore
+build/
+dist/
+*.egg-info/
+*.egg
+*.py[cod]
+__pycache__/
+*.so
+*~
+.idea/
+.vscode/
+
+# Due to using tox and pytest
+.tox
+.cache
+
+# Files created by the examples
+examples/*.txt
+examples/*/

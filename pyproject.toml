@@ -1,0 +1,34 @@
+[project]
+name = "ztffp"
+version = "2.0.0"
+description = "ZTF Forced-Photometry library (Unaffiliated)"
+requires-python = ">=3.10"
+license = {file = "LICENSE.txt"}
+keywords = ["astronomy"]
+authors = [
+  {name = "Michael C. Stroh", email = "ztffp@michaelcstroh.com" }
+]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+  "astropy>=4.3.0",
+  "lxml>=4.9.0",
+  "matplotlib>=3.5.3",
+  "numpy>=1.21.0",
+  "pandas>=1.3.5",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/mcstroh/ztffp"
+"Bug Reports" = "https://github.com/mcstroh/ztffp/issues"
+"Source" = "https://github.com/mcstroh/ztffp/"
+
+[tool.setuptools]
+package-data = {"sample" = ["*.dat", "*.csv", "*.txt", "*.sql"]}
+[build-system]
+requires = ["setuptools>=67.0.0", "wheel"]
+build-backend = "setuptools.build_meta"

@@ -26,16 +26,15 @@ import re
 import shutil
 import string
 import subprocess
-import sys
 import time
+import warnings
+# Disable warnings from log10 when there are non-detections
+warnings.filterwarnings("ignore")
+
 
 import matplotlib
 matplotlib.use('AGG') # Run faster, comment out for interactive plotting
 import matplotlib.pyplot as plt
-
-import warnings
-warnings.filterwarnings("ignore") # We'll get warnings from log10 when there are non-detections
-
 
 #
 # Generic ZTF webdav login
@@ -47,58 +46,69 @@ _ztfinfo = "dontgocrazy!"
 #
 # Import ZTF email user information
 #
-def import_credentials():
+def import_credentials() -> None:
+    '''Load ZTF credentials from environmental variables.'''
 
     try:
 
         global _ztffp_email_address
-        _ztffp_email_address = os.environ["ztf_email_address"]
+        _ztffp_email_address = os.getenv("ztf_email_address", None)
         global _ztffp_email_password
-        _ztffp_email_password = os.environ["ztf_email_password"]
+        _ztffp_email_password = os.getenv("ztf_email_password", None)
         global _ztffp_email_server
-        _ztffp_email_server = os.environ["ztf_email_imapserver"]
-        # The email address associated with the ZTF FP server may be an alias, so allow for that possiblility
+        _ztffp_email_server = os.getenv("ztf_email_imapserver", None)
+        # The email address associated with the ZTF FP server may be an alias,
+        # so allow for that possiblility
         global _ztffp_user_address
         if 'ztf_user_address' in os.environ:
-            _ztffp_user_address = os.environ["ztf_user_address"]
+            _ztffp_user_address = os.getenv("ztf_user_address", None)
         # Assume ZTF and login email address are the same
         else:
             _ztffp_user_address = _ztffp_email_address
         global _ztffp_user_password
-        _ztffp_user_password = os.environ["ztf_user_password"]
+        _ztffp_user_password = os.getenv("ztf_user_password", None)
 
         # Success!
         return True
 
-
     except:
-        print("ZTF credentials are not found in the environmental variables.\nPlease check the README file on github for information on how to set this up.")
+        print("ZTF credentials are not found in the environmental variables.")
+        print("Please check the README file on github for setup instructions.")
     
         # Unsuccessful
         return False
 
 
+def wget_check() -> bool:
+    '''Check if wget is installed on the system.'''
 
-def wget_check():
-
+    wget_installed: bool = False
     if shutil.which("wget") is None:
-       print("ztf_fp.py requires wget installed on your system (not the wget python library). Please install before continuing.")
-       return False
+        wget_text = (f"wget is not installed on your system "
+                     "(not the Python library). "
+                     f"Please install wget before continuing.\n")
+        print(wget_text)
+
     else:
-        return True
+        wget_installed = True
+
+    return wget_installed
 
 
-def random_log_file_name():
+def random_log_file_name() -> str:
+    '''Generate a random log file name.'''
 
-    log_file_name = None
+    log_file_name: str | None = None
     while log_file_name is None or os.path.exists(log_file_name):
-        log_file_name = f"ztffp_{''.join(random.choices(string.ascii_uppercase + string.digits, k=10))}.txt"
+        random_chars = ''.join(random.choices(string.ascii_uppercase + string.digits,
+                                              k=10))
+        log_file_name = f"ztffp_{random_chars}.txt"
     
     return log_file_name
 
 
-
-def download_ztf_url(url, verbose=True):
+def download_ztf_url(url: str, verbose: bool = True) -> str | None:
+    '''Download a ZTF files using wget.'''
 
     # Wget is required to download the ZTF forced photometry request submission
     wget_installed = wget_check()
@@ -106,16 +116,17 @@ def download_ztf_url(url, verbose=True):
         return None
 
 
-    wget_command = f"wget --http-user={_ztfuser} --http-password={_ztfinfo} -O {url.split('/')[-1]} \"{url}\""
+    wget_command = (f"wget --http-user={_ztfuser} "
+                    f"--http-password={_ztfinfo} "
+                    f"-O {url.split('/')[-1]} {url}")
     
     if verbose:
         print("Downloading file...")
-        print('\t' + wget_command)
-    p = subprocess.Popen(wget_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-    stdout, stderr = p.communicate()
+        print(f'\t{wget_command}')
+
+    subprocess.run(wget_command.split(), capture_output=True)
 
     return url.split('/')[-1]
-
 
 
 def match_ztf_message(job_info, message_body, message_time_epoch, time_delta=10, new_email_matching=False, angular_separation=2):
@@ -186,31 +197,35 @@ def match_ztf_message(job_info, message_body, message_time_epoch, time_delta=10,
 
                     match = True
 
-
     return match
 
 
-
-def read_job_log(file_name):
+def read_job_log(file_name: str) -> pd.DataFrame:
 
     job_info = pd.read_html(file_name)[0]
-    job_info['ra'] = np.format_float_positional(float(job_info['ra'].to_list()[0]), precision=6, pad_right=6).replace(' ','0')
-    job_info['dec'] = np.format_float_positional(float(job_info['dec'].to_list()[0]), precision=6, pad_right=6).replace(' ','0')
-    job_info['jdstart'] = np.format_float_positional(float(job_info['jdstart'].to_list()[0]), precision=6, pad_right=6).replace(' ','0')
-    job_info['jdend'] = np.format_float_positional(float(job_info['jdend'].to_list()[0]), precision=6, pad_right=6).replace(' ','0')
-    job_info['isostart'] = Time(float(job_info['jdstart'].to_list()[0]), format='jd', scale='utc').iso
-    job_info['isoend'] = Time(float(job_info['jdend'].to_list()[0]), format='jd', scale='utc').iso
+    job_info['ra'] = np.format_float_positional(float(job_info['ra'].to_list()[0]),
+                                                precision=6, pad_right=6).replace(' ','0')
+    job_info['dec'] = np.format_float_positional(float(job_info['dec'].to_list()[0]),
+                                                 precision=6, pad_right=6).replace(' ','0')
+    job_info['jdstart'] = np.format_float_positional(float(job_info['jdstart'].to_list()[0]),
+                                                     precision=6, pad_right=6).replace(' ','0')
+    job_info['jdend'] = np.format_float_positional(float(job_info['jdend'].to_list()[0]),
+                                                   precision=6, pad_right=6).replace(' ','0')
+    job_info['isostart'] = Time(float(job_info['jdstart'].to_list()[0]),
+                                format='jd', scale='utc').iso
+    job_info['isoend'] = Time(float(job_info['jdend'].to_list()[0]),
+                              format='jd', scale='utc').iso
     job_info['ctime'] = os.path.getctime(file_name) - time.localtime().tm_gmtoff
     job_info['cdatetime'] = datetime.fromtimestamp(os.path.getctime(file_name))
 
     return job_info
 
 
-
-#
-# Test the connection to the users email server
-#
 def test_email_connection(n_attempts = 5):
+    '''
+    Checks the given email address and password
+    to see if a connection can be made.
+    '''
 
     # Try a few times to be certain.
     for attempt in range(n_attempts):
@@ -222,7 +237,10 @@ def test_email_connection(n_attempts = 5):
 
             status, messages = imap.select("INBOX")
             if status=='OK':
-                print(f"Your email inbox was found and contains {int(messages[0])} messages.\nIf this is not correct, please check your settings.")
+                found_message = ("Your email inbox was found and contains "
+                                 f"{int(messages[0])} messages.\n"
+                                 "If this is not correct, please check your settings.")
+                print(found_message)
             else:
                 print(f"Your inbox was not located. Please check your settings.")
         
@@ -232,28 +250,40 @@ def test_email_connection(n_attempts = 5):
             # A successful connection was made
             return True
 
-
         # Connection could be broken
         except Exception:
             print("Encountered an exception when connecting to your email address. Trying again.")
-            time.sleep(10) # Give a small timeout in the case of an intermittent connection issue.
-            
+            # Give a small timeout in the case of an intermittent connection issue.
+            time.sleep(10)
 
     # No successful connection was made
     return False
 
 
+def query_ztf_email(log_file_name: str,
+                    source_name: str ='temp',
+                    new_email_matching: bool = False,
+                    verbose: bool = True):
+    '''
+    Checks the given email address for a message from ZTF.
 
-#
-# Look for email to download data products
-# 
-def query_ztf_email(log_file_name, source_name='temp', new_email_matching=False, verbose=True):
+    Parameters
+    ----------
+    log_file_name : str
+        The name of the log file to check for a match.
+    source_name : str, optional
+        The name of the source that will be used for output files.
+    new_email_matching : bool, optional
+        If True, the email must be new.
+    verbose : bool, optional
+        If True, print out more information for logging.
+    '''
 
     downloaded_file_names = None
 
     if not os.path.exists(log_file_name):
 
-        f"{log_file_name} does not exist."
+        print(f"{log_file_name} does not exist.")
         return -1
 
 
@@ -322,10 +352,8 @@ def query_ztf_email(log_file_name, source_name='temp', new_email_matching=False,
                                 os.rename(log_initial_file_name, log_final_name)
                                 downloaded_file_names = [lc_final_name, log_final_name]
 
-
         imap.close()
         imap.logout()
-
 
     # Connection could be broken
     except Exception:
@@ -339,29 +367,49 @@ def query_ztf_email(log_file_name, source_name='temp', new_email_matching=False,
     
     return downloaded_file_names
 
-                    
 
+def ztf_forced_photometry(ra: int | float | str | None,
+                          decl: int | float | str | None,
+                          jdstart: float | None = None,
+                          jdend: float | None = None,
+                          days: int | float = 60,
+                          send: bool = True,
+                          verbose: bool = True) -> str | None:
+    '''
+    Submits a request to the ZTF Forced Photometry service.
 
-def ztf_forced_photometry(ra, decl, jdstart=None, jdend=None, days=60, send=True, verbose=True):
+    Parameters
+    ----------
+    ra : int, float, str, or None
+        The right ascension of the source in decimal degrees or sexagesimal.
+    decl : int, float, str, or None
+        The declination of the source in decimal degrees or sexagesimal.
+    jdstart : float, optional
+        The start Julian date for the query.
+        If None, the current date minus 60 days will be used.
+    jdend : float, optional
+        The end Julian date for the query.
+        If None, the current date will be used.
+    days : int or float, optional
+        The number of days to query.
+        This is only used if jdstart and jdend are None.
+    send : bool, optional
+        If True, the request will be sent to the ZTF Forced Photometry service.
+    '''
 
     # Wget is required for the ZTF forced photometry request submission
     wget_installed = wget_check()
     if wget_installed==False:
         return None
 
-
     #
     # Set dates
     #
     if jdend is None:
-
         jdend = Time(datetime.utcnow(), scale='utc').jd
 
-
     if jdstart is None:
-
         jdstart = jdend - days
-    
 
     if ra is not None and decl is not None:
 
@@ -375,41 +423,39 @@ def ztf_forced_photometry(ra, decl, jdstart=None, jdend=None, days=60, send=True
         # Else assume sexagesimal
         except Exception:
             skycoord = SkyCoord(ra, decl, frame='icrs', unit=(u.hourangle, u.deg))
-            
 
-        # Convert to string to keep same precision. This will make matching easier in the case of submitting multiple jobs.
+        # Convert to string to keep same precision.
+        # This will make matching easier in the case of submitting multiple jobs.
         jdend_str = np.format_float_positional(float(jdend), precision=6)
         jdstart_str = np.format_float_positional(float(jdstart), precision=6)
         ra_str = np.format_float_positional(float(skycoord.ra.deg), precision=6)
         decl_str = np.format_float_positional(float(skycoord.dec.deg), precision=6)
-
 
         log_file_name = random_log_file_name() # Unique file name
 
         if verbose:
             print(f"Sending ZTF request for (R.A.,Decl)=({ra},{decl})")
         
-        wget_command = f"wget --http-user={_ztfuser} --http-passwd={_ztfinfo} -O {log_file_name} \"https://ztfweb.ipac.caltech.edu/cgi-bin/requestForcedPhotometry.cgi?" + \
-                       f"ra={ra_str}&" + \
-                       f"dec={decl_str}&" + \
-                       f"jdstart={jdstart_str}&" +\
-                       f"jdend={jdend_str}&" + \
-                       f"email={_ztffp_user_address}&userpass={_ztffp_user_password}\""
-        
+        wget_command = (f"wget --http-user={_ztfuser} "
+                        f"--http-passwd={_ztfinfo} "
+                        f"-O {log_file_name} "
+                        "https://ztfweb.ipac.caltech.edu/cgi-bin/requestForcedPhotometry.cgi?"
+                        f"ra={ra_str}&"
+                        f"dec={decl_str}&"
+                        f"jdstart={jdstart_str}&"
+                        f"jdend={jdend_str}&"
+                        f"email={_ztffp_user_address}&userpass={_ztffp_user_password}")
+
+        # Replace .& with .0& to avoid wget error
+        wget_command = wget_command.replace('.&', '.0&')
+
         if verbose:
             print(wget_command)
 
         if send:
-    
-            p = subprocess.Popen(wget_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-            stdout, stderr = p.communicate()
+            subprocess.run(wget_command.split(), capture_output=True)
 
-            if verbose:
-                print(stdout.decode('utf-8'))
-
-        
         return log_file_name
-
 
     else:
         
@@ -417,16 +463,20 @@ def ztf_forced_photometry(ra, decl, jdstart=None, jdend=None, days=60, send=True
             print("Missing necessary R.A. or declination.")
         return None
 
-
-
-def plot_ztf_fp(lc_file_name, file_format='.png', threshold=3.0, upperlimit=5.0, verbose=False):
+def plot_ztf_fp(lc_file_name: str,
+                file_format: str = '.png',
+                threshold: int | float = 3.0,
+                upperlimit: int | float = 5.0,
+                verbose: bool = False):
+    '''
+    Create a simple ZTF forced photometry light curve.
+    '''
 
     # Color mapping for figures
-    filter_colors = {'ZTF_g': 'g', 'ZTF_r': 'r', 'ZTF_i': 'darkorange'}
+    filter_colors: dict = {'ZTF_g': 'g',
+                           'ZTF_r': 'r',
+                           'ZTF_i': 'darkorange'}
 
-
-    # Use default naming convention
-    plot_file_name = lc_file_name.replace('.txt', '.png')
 
     try:
         ztf_fp_df = pd.read_csv(lc_file_name, delimiter=' ', comment='#')
@@ -436,18 +486,16 @@ def plot_ztf_fp(lc_file_name, file_format='.png', threshold=3.0, upperlimit=5.0,
         return
 
     # Rename columns due to mix of , and ' ' separations in the files
-    new_cols = dict()
+    new_cols = {}
     for col in ztf_fp_df.columns:
         new_cols[col] = col.replace(',','')
     
-    # Make a clean version
+    # Make a cleaned-up version
     ztf_fp_df.rename(columns=new_cols, inplace=True)
     ztf_fp_df.drop(columns=['Unnamed: 0'], inplace=True)
 
-    #
     # Create additional columns with useful calculations
-    #
-    ztf_fp_df['mjd_midpoint'] = ztf_fp_df['jd'] - 2400000.5 - ztf_fp_df['exptime']/2./86400. # Do it all at once here
+    ztf_fp_df['mjd_midpoint'] = ztf_fp_df['jd'] - 2400000.5 - ztf_fp_df['exptime']/2./86400.
     ztf_fp_df['fp_mag'] = ztf_fp_df['zpdiff'] - 2.5*np.log10(ztf_fp_df['forcediffimflux'])
     ztf_fp_df['fp_mag_unc'] = 1.0857 * ztf_fp_df['forcediffimfluxunc']/ztf_fp_df['forcediffimflux']
     ztf_fp_df['fp_ul'] = ztf_fp_df['zpdiff'] - 2.5*np.log10(upperlimit * ztf_fp_df['forcediffimfluxunc'])
@@ -491,40 +539,89 @@ def plot_ztf_fp(lc_file_name, file_format='.png', threshold=3.0, upperlimit=5.0,
 
     return output_file_name
 
-
 #
 # Wrapper function so that other python code can call this
 #
-def run_ztf_fp(all_jd=False, days=60, decl=None, directory_path='.',
-               do_plot=True, emailcheck=20, fivemindelay=60, jdend=None, 
-               jdstart=None, logfile=None, mjdend=None, mjdstart=None, 
-               plotfile=None, ra=None, skip_clean=False, source_name='temp', 
-               test_email=False, new_email_matching=False, verbose=False):
+def run_ztf_fp(all_jd: bool = False,
+               days: int | float = 60,
+               decl: int | float | None = None,
+               directory_path: str = '.',
+               do_plot: bool = True,
+               emailcheck: int = 20,
+               fivemindelay: int =60,
+               jdend: float | int | None = None,
+               jdstart: float | int | None = None,
+               logfile: str | None = None,
+               mjdend: float | int | None = None,
+               mjdstart: float | int | None = None,
+               plotfile: str | None = None,
+               ra: int | float | None = None,
+               skip_clean: bool = False,
+               source_name: str = 'temp',
+               test_email: bool = False,
+               new_email_matching: bool = False,
+               verbose: bool = False):
+    '''
+    Wrapper function to run the ZTF Forced Photometry code.
 
+    Parameters
+    ----------
+    all_jd : bool, optional
+        If True, will run the code for all JDs in the given range. If False, will only run for the first JD in the range. The default is False.
+    days : int or float, optional
+        Number of days to run the code for. The default is 60.
+    decl : int or float, optional
+        Declination of the source in degrees. The default is None.
+    directory_path : str, optional
+        Path to the directory where the code will be run. The default is '.'.
+    do_plot : bool, optional
+        If True, will create a plot of the light curve. The default is True.
+    emailcheck : int, optional
+        Number of minutes between email checks. The default is 20.
+    fivemindelay : int, optional
+        Number of minutes to wait before checking for new data. The default is 60.
+    jdend : float or int, optional
+        Last JD to run the code for. The default is None.
+    jdstart : float or int, optional
+        First JD to run the code for. The default is None.
+    logfile : str, optional
+        Name of the log file. The default is None.
+    mjdend : float or int, optional
+        Last MJD to run the code for. The default is None.
+    mjdstart : float or int, optional
+        First MJD to run the code for. The default is None.
+    plotfile : str, optional
+        Name of the plot file. The default is None.
+    ra : int or float, optional
+        Right ascension of the source in degrees. The default is None.
+    skip_clean : bool, optional
+        If True, will skip the cleaning step. The default is False.
+    source_name : str, optional
+        Name of the source. The default is 'temp'.
+    test_email : bool, optional
+        If True, will test the email connection. The default is False.
+    new_email_matching : bool, optional
+        If True, will require the email is new. The default is False.
+    verbose : bool, optional
+        If True, will print out more information. The default is False.
+    '''
 
-    #
     # Stop early if credentials were not found
-    #
     credentials_imported = import_credentials()
     if credentials_imported == False:
         return -1
 
-
-    #
     # Exit early if no sufficient conditions given to run
-    #
     run = False
     if (ra is not None and decl is not None) or (logfile is not None) or \
         (plotfile is not None) or (test_email==True):
         run = True
-
 
     # Go home early
     if run==False:
         print("Insufficient parameters given to run.")
         return -1
 
-    
     # Perform an email test if necessary
     if test_email==True:
 
@@ -532,34 +629,34 @@ def run_ztf_fp(all_jd=False, days=60, decl=None, directory_path='.',
         email_connection_status = test_email_connection()
         return
 
-
     #
     # Change necessary variables based on what was provided
     #
-    
+
     # Override jd values if mjd arguments are supplied
     if mjdstart is not None:
         jdstart = mjdstart + 2400000.5
     if mjdend is not None:
         jdend = mjdend + 2400000.5
 
-
     # Set to full ZTF range
     if all_jd:
         jdstart = 2458194.5
         jdend = Time(datetime.utcnow(), scale='utc').jd
 
-
     log_file_name = None
     if logfile is None and plotfile is None:
 
-        log_file_name = ztf_forced_photometry(ra=ra, decl=decl, jdstart=jdstart, jdend=jdend, days=days)
+        log_file_name = ztf_forced_photometry(ra=ra,
+                                              decl=decl,
+                                              jdstart=jdstart,
+                                              jdend=jdend,
+                                              days=days)
     
     else:
 
         log_file_name = logfile
         plot_file_name = plotfile
-
 
     if log_file_name is not None:
 
@@ -572,7 +669,10 @@ def run_ztf_fp(all_jd=False, days=60, decl=None, directory_path='.',
                 if verbose:
                     print(f"Waiting for the email (rechecking every {emailcheck} seconds).")
 
-            downloaded_file_names = query_ztf_email(log_file_name, source_name=source_name, new_email_matching=new_email_matching, verbose=verbose)
+            downloaded_file_names = query_ztf_email(log_file_name,
+                                                    source_name=source_name,
+                                                    new_email_matching=new_email_matching,
+                                                    verbose=verbose)
 
             if downloaded_file_names == -1:
                 if verbose:
@@ -613,11 +713,8 @@ def run_ztf_fp(all_jd=False, days=60, decl=None, directory_path='.',
                 print(f"Creating {output_directory}")
             os.makedirs(output_directory)
 
-
-        #
         # Move all files to this location
-        #
-        
+
         # Wget log file
         output_files = list()
         if log_file_name is not None and os.path.exists(log_file_name):
@@ -650,86 +747,3 @@ def run_ztf_fp(all_jd=False, days=60, decl=None, directory_path='.',
 
     # Useful for automation
     return output_files
-
-
-
-def main():
-
-    # First 'fix' possible negative declinations which argparse can't handle on its own
-    for i, arg in enumerate(sys.argv):
-        if (arg[0] == '-') and arg[1].isdigit(): sys.argv[i] = ' ' + arg
-
-    # Initialize argument parser.
-    parser = argparse.ArgumentParser(prog="ztf_fp.py <ra> <decl>", description='Grab ZTF forced photometry on the given location.', formatter_class=argparse.RawTextHelpFormatter)
-
-    # Necessary arguments
-    parser.add_argument('ra', type=str, nargs='?', default=None,
-                   help="Right ascension of the target. Can be provided in DDD.ddd or HH:MM:SS.ss formats.")
-    parser.add_argument('decl', type=str, nargs='?', default=None,
-                   help="Declination of the target. Can be provided in +/-DDD.ddd or DD:MM:SS.ss formats.")
-    # OR (query has already been sent)
-    parser.add_argument('-logfile', metavar='logfile', type=str, nargs='?', default=None, 
-                   help='Log file to process instead of submitting a new job.')
-    # OR (option to only build light curve)
-    parser.add_argument('-plotfile', metavar='plotfile', type=str, nargs='?', default=None, 
-                   help='Light curve file to plot instead of submitting and downloading a new job.')
-    # OR (option to test email connection without sending a request to ZTF)
-    parser.add_argument('-emailtest', action='store_true', dest='test_email',
-                   help='Test your email settings. This is performed without sending a request to the ZTF server.')
-    parser.set_defaults(test_email=False)
-
-
-    # Additional arguments we can use
-    parser.add_argument('-source_name', metavar='source_name', type=str, nargs='?', default='temp_source', 
-                   help='Source name that will be used to name output files.')    
-    parser.add_argument('-mjdstart', metavar='mjdstart', type=float, nargs='?', default=None, 
-                   help='Start of date range for forced photometry query. Overrides -jdstart.')    
-    parser.add_argument('-mjdend', metavar='mjdend', type=float, nargs='?', default=None, 
-                   help='End of date range for forced photometry query. Overrides -jdstop')
-    parser.add_argument('-jdstart', metavar='jdstart', type=float, nargs='?', default=None, 
-                   help='Start of date range for forced photometry query.')    
-    parser.add_argument('-jdend', metavar='jdend', type=float, nargs='?', default=None, 
-                   help='End of date range for forced photometry query.')
-    parser.add_argument('-ztf_all_jd', action='store_true', dest='all_jd',
-                   help='Use the full range of ZTF public dates.')
-    parser.set_defaults(all_jd=False)
-    parser.add_argument('-days', metavar='days', type=int, nargs='?', default=60, 
-                   help='Number of days prior to jdend to query (or number of days prior to today if jdend is not given).')    
-    parser.add_argument('-emailcheck', metavar='emailcheck', type=float, nargs='?', default=20, 
-                   help='How often to recheck your email for the ZTF results.')
-    parser.add_argument('-skip_clean', action='store_false', dest='skip_clean',
-                   help='After completion skip placing all output files in the same directory.')
-    parser.set_defaults(skip_clean=False)
-    parser.add_argument('-directory_path', metavar='directory_path', type=str, nargs='?', default='.', 
-                   help='Path to directory for clean-up. Requires -directory option.') 
-    parser.add_argument('-fivemindelay', metavar='fivemindelay', type=float, nargs='?', default=60, 
-                   help='How often (in seconds) to query the email after 5 minutes have elapsed.')    
-    parser.add_argument('-email_matching', action='store_false', dest='new_email_matching',
-                   help='Use the alternative constraints requiring a new email, and similar positions, but no time matching.')
-    parser.set_defaults(new_email_matching=True)
-    parser.add_argument('-skip_plot', action='store_false', dest='do_plot',
-                   help='Skip making the plot. Useful for automated and batch use cases, or if user wants to use their personal plotting code.')
-    parser.set_defaults(do_plot=True)
-
-
-
-    try:
-        # Validate inputs
-        args = parser.parse_args()
-        run = True
-
-    except Exception:
-
-        run = False
-    
-
-    # Don't go further if there were problems with arguments or inputs
-    if run:
-
-        run_ztf_fp(**vars(args), verbose=True)
-
-
-
-if __name__ == "__main__":
-    main()
-
